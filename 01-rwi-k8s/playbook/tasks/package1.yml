@@ -1,0 +1,53 @@
+    - name: Install packages
+      become: true
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - zip
+        - pip
+        - curl
+        - nfs-kernel-server
+        - nfs-common
+        - systemd-timesyncd
+        - docker
+        - docker.io
+        - docker-compose
+        - python3-docker
+        - ca-certificates
+        - apt-transport-https
+        - amazon-ecr-credential-helper
+        - iptables
+
+    - name: Make sure NTP service is running
+      become: true
+      ansible.builtin.systemd:
+        state: started
+        name: systemd-timesyncd
+
+    - name: Install boto 
+      become: true
+      ansible.builtin.shell: |
+        pip install botocore
+        pip install boto3
+
+    - name: Check if awscli installed
+      shell: |
+        aws --version
+      register: aws_version
+      ignore_errors: true
+
+    - name: Install awscli
+      become: true
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+      when:  aws_version.stdout.find('aws-cli') == -1
+      ignore_errors: true
+
+    - name: Remove excess packages no longer needed
+      become: true
+      ansible.builtin.apt:
+        autoremove: yes
+

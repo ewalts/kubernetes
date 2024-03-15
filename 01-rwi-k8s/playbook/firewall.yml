@@ -1,0 +1,53 @@
+- name: Replace UFW with Iptables
+  hosts: ec2hosts
+  remote_user: ubuntu
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      connection: local
+
+    - name: remove ufw firewall
+      become: true
+      apt:
+        name: ufw
+        state: absent
+      ignore_errors: true
+      register: result
+    - debug:
+        msg: "{{ result }}"
+
+    - name: install iptables
+      become: true
+      apt:
+        name: iptables
+        state: present
+      ignore_errors: true
+      register: result
+    - debug:
+        msg: "{{ result }}"
+
+    - name: Iptables - Allow ssh connections
+      become: true
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        ctstate: NEW,ESTABLISHED,RELATED
+        source: "{{ item }}"
+        destination_ports:
+          - "22"
+        jump: ACCEPT
+        state: present
+      ignore_errors: true
+      loop:
+        - "{{ ncom_net_cidr }}"
+        - "{{ my_ip }}"
+        - "{{ pod_cidr }}"
+      

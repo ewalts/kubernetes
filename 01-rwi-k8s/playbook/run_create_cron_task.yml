@@ -1,0 +1,10 @@
+- name: Create cron for token update
+  hosts: k8scp
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: import cron create task
+      import_tasks:
+        file: tasks/create_join_token_cron.yml

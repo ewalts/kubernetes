@@ -1,0 +1,19 @@
+- name: create directory structure
+  become: true
+  file: 
+    state: directory
+    path: "{{ item }}"
+    owner: "{{ my_user }}"
+    group: "{{ ssh_group }}"
+    mode: '0775'
+  loop:
+    - "{{ deploy_path }}"
+    - "{{ deploy_path }}/logs"
+    - "{{ deploy_path }}/cronjobs"
+    - "{{ deploy_path }}/docs"
+
+- name: create home link
+  become: true
+  shell: |
+    ln -s "{{ deploy_path }}" "/home/{{ my_user }}/{{ product_id }}"
+

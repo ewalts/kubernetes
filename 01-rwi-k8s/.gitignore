@@ -1,0 +1,6 @@
+/scripts
+/scripts/*
+/playbook/vars/sec_vars.yml
+sec_vars.yml
+sec_vars*
+inventory.yml

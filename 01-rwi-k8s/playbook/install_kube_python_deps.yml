@@ -1,0 +1,13 @@
+- name: Install python deps for kuberenets
+  hosts: k8scp
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: pre-requisites
+      pip:
+        name:
+          - pyyaml
+          - kubernetes
+

@@ -1,0 +1,56 @@
+###> RWI Technology Kubernetes Deployment
+###> Deployment details
+copy_local_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+###> Tags
+web_tags_name: "{{ product_id }}-site"
+host_purpose: k8s
+product_tag: "{{ product_id }}"
+
+deploy_path: "/usr/share/{{ product_id }}"
+asg_name: "{{ product_id }}-w2-asg"
+ami_name: "{{ product_id }}-ubu-22"
+tags_name: "{{ product_id }}-w2"
+
+s3_repo: "s3://{{ product_id }}"
+s3_bucket: "{{ product_id }}"
+s3_policy: "{{ script_path }}/{{ product_id }}-s3-json"
+s3_policy_source: ~/.ansible/iam/k8s_ec2_policy.json
+
+ecr_reg_name: "{{ product_id }}"
+iam_role: "{{ product_id }}-w2-EC2-Role"
+instance_profile: "{{ product_id }}-w2-EC2Profile"
+policy_name: "{{ product_id }}-w2-EC2Policy"
+item: "{{ product_id }}-w2-cp1"
+key_name: "{{ product_id }}"
+ncom_net_sg: "{{ product_id }}-w2-ncoms"
+sg: "{{ product_id }}-w2-ncoms"
+sg_tag_name: "{{ product_id }}-w2-ncoms"
+new_env: "{{ product_id }}"
+script_path: "{{ dep_home }}/playbook/scripts"
+key_file: "{{ key_dir }}/{{ product_id }}.pem"
+my_ssh_key_path: "{{ key_dir }}/{{ product_id }}.pem"
+my_elb: "{{ product_id }}-w2-lb01"
+k8s_asg_lt: "{{ product_id }}-launch-template"
+k8s_asg: "{{ product_id }}-w2-asg"
+target_group: "{{ product_id }}-targets"
+tg_protocol: TCP
+tg_port: ["80","443"]
+
+#################################
+deployment_log: "{{ dep_home }}/playbook/vars/deployment_output_vars.yml"
+subnet_tag_name: "{{ product_id }}-w2-subnet"              
+
+ncom_tag_name: "{{ product_id }}-w2"          
+tags_service: "{{ product_id }}"         
+asg_lt: "{{ product_id }}-w2-cl-lt"      
+
+###> Local logstash pipeline
+# logstash_config: files/logstash.conf
+# logstash_pipline: files/logstash_pipe.json
+# elsatic_dest: 10.10.10.10:9200
+
+###>  Central logging
+#rsyslog_file: files/rsyslog.conf  ###> Single remote host for central logging via syslog facility.
+#log_dest:  ###> Syslog/logstash host:port When already defined, deployment is not going to automatically asign this value
+

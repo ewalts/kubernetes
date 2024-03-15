@@ -1,0 +1,36 @@
+- name: Fetch ASG Info
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../vars/sec_vars.yml
+    - ../vars/deployment_vars.yml
+  tasks:
+    - name: Include asg info task
+      import_tasks:
+        file: tasks/asg_info.yml
+
+    - name: add asg instances to k3swn group
+      add_host:
+        hostname: "{{ int.instances[0].network_interfaces[0]['association']['public_ip'] }}"
+        groups:
+          - ec2hosts
+          - k8s
+          - k8swn
+      loop: "{{ ec2.results }}"
+      loop_control:
+        loop_var: int
+
+    - debug:
+        msg: "{{ groups }}"
+
+    - name: Update deployment inventory.yml
+      shell: |
+        php "{{ script_path }}/update_inventory.php" "{{ groups }}"
+      ignore_errors: true
+      register: php_output
+    - debug:
+        msg: "{{ php_output }}"
+
+
+#   - name: Update inventory with k8swn
+#    

@@ -1,0 +1,19 @@
+- name: Helm Installation Ubuntu
+  hosts: k8scp
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Copy script from s3
+      shell: |
+        aws s3 cp "{{ s3_repo }}"/ubuntu_helm_install.sh  $HOME/ubuntu_helm_install.sh
+        chmod 0770 ubuntu_helm_install.sh
+
+    - name: Run installation script
+      shell: |
+        sh -c $HOME/ubuntu_helm_install.sh
+      register: result
+
+    - debug:
+        msg: "{{ result.stdout }}"

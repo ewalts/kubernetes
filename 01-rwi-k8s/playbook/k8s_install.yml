@@ -1,0 +1,96 @@
+---
+###  For Ubuntu. Install and configure Kubernetes
+- name: Perform kubernetes installation
+  hosts:  ec2hosts
+  become: true
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  become_method: sudo
+  gather_facts: false
+  tasks:
+
+    - name: Wait for ssh
+      ansible.builtin.wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      connection: local
+
+    - name: create home link
+      shell: |
+        ln -s "{{ deploy_path }}" "$HOME/{{ product_id }}"
+
+    - name: Create the k8s modules file.
+      ansible.builtin.file:
+        path: /etc/modules-load.d/k8s.conf
+        state: touch
+
+    - name: Include and load k8s kernel modules.
+      ansible.builtin.blockinfile:
+        path: /etc/modules-load.d/k8s.conf
+        block: |
+          overlay
+          br_netfilter
+
+    - name: modprobe
+      ansible.builtin.shell: |
+        sudo modprobe overlay
+        sudo modprobe br_netfilter
+
+    - name: System configurations for Kubernetes networking
+      ansible.builtin.file:
+        path: /etc/sysctl.d/99-k8s.conf
+        state: touch
+
+    - name: Add conf for containerd
+      ansible.builtin.blockinfile:
+        path: /etc/sysctl.d/99-k8s.conf
+        block: |
+          net.bridge.bridge-nf-ck8s-iptables = 1
+          net.ipv4.ip_forward = 1
+          net.bridge.bridge-nf-ck8s-ip6tables = 1
+
+    - name: Apply new settings
+      ansible.builtin.shell: |
+        sudo sysctl --system
+
+    - name: Install containerd
+      ansible.builtin.shell: |
+        sudo apt-get update  
+        sudo apt-get install -y containerd
+        sudo mkdir -p /etc/containerd
+        sudo containerd config default > /etc/containerd/config.toml
+        sudo sed -i 's/            SystemdCgroup = false/            SystemdCgroup = true/g' /etc/containerd/config.toml
+        sudo systemctl restart containerd
+
+    - name: Turning off swap space
+      ansible.builtin.shell: |
+        sudo swapoff -a
+        sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+    - name: Install and repositories
+      become: true
+      ansible.builtin.shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+    - name: Kubernetes repository file creation
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        state: touch
+
+    - name: K8s installation Source source repository
+      ansible.builtin.blockinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        block: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /
+
+    - name: Package install ation kubelet kubeadm kubectl docker.io
+      ansible.builtin.shell: |
+        sudo apt-get update
+        sudo apt-get -y install  kubelet kubeadm kubectl docker.io helm
+        sudo apt-mark hold kubelet kubeadm kubectl docker.io
+

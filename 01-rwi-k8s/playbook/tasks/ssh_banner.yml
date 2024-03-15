@@ -1,0 +1,16 @@
+- name: define ssh banner
+  become: true
+  copy:
+    src: "{{ constants }}/rewbin_topper.txt"
+    dest: "{{ deploy_path }}/docs/banner"
+    owner: "{{ my_user }}"
+    group: "{{ ssh_group }}"
+    mode: 0664
+
+- name: Update ssh config
+  become: true
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: Banner
+    line: Banner "{{ deploy_path }}/docs/banner"
+

@@ -1,0 +1,62 @@
+- name: Create disk for persistant volume
+  hosts: localhost
+  vars_files:
+    - vars/sec_vars.yml
+    - /vars/asg_infrastructure.yml
+  gather_facts: false
+
+  tasks:
+    - name: Fetch subnet info
+      amazon.aws.ec2_vpc_subnet_info:
+        security_group: "{{ ncom_sg_name }}"
+        filters:
+          vpc-id: "{{ vpc_id }}"
+          "tag:environment": "{{ new_env }}"
+          "tag:Name": "{{ subnet_tag_name }}"
+      register: subnet
+
+    - name: Fetch security group info
+      amazon.aws.ec2_security_group_info:
+        filters:
+          group-name: "{{ sg }}"
+          vpc-id: "{{ vpc_id }}"
+          "tag:Name": "{{ sg_tag_name }}"
+          "tag:environment": "{{ new_env }}" 
+      register: sec_group
+
+    - name: Create EFS volume
+      community.aws.efs:
+        targets:
+          - "{{ subnet[0]['subnet_id'] }}"
+          - "{{ sec_group[0]['sg_id' }}"
+        size: 10Gi
+        type: gp2
+        filters:
+          "tag:environment": "{{ new_env }}"
+          "tag:Name": "{{ pv1_name }}"
+      register: pv1 
+
+- name: Mount persistant volume
+  hosts: ec2hosts
+  gather_facts: false
+
+  tasks:
+    - name: Create mount point
+      become: true
+      ansible.builtin.file:
+        name: /mnt/pv1/
+        state: present
+        mode: 0775
+
+    - name: Reboot hosts
+      become: true
+      ansible.builtin.reboot:
+
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      connection: local
+

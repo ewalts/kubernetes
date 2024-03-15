@@ -1,0 +1,12 @@
+- name: Remove Calico Tigera Operator
+  hosts: k8scp
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Uninstall CNI plugin Tigera Operator Calico
+      ansible.builtin.shell: |
+        kubectl delete -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/tigera-operator.yaml
+      register: result
+    - debug:
+        msg: "{{ result }}"

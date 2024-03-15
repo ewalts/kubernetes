@@ -1,0 +1,49 @@
+---
+
+- name: AWS - rollback deployment infrastructure - k8s-ubuntu-cluster
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+    - output/deployment_register_vars.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Remove auto scaling group
+      amazon.aws.autoscaling_group:
+        name: "{{ asg_name }}"
+        availability_zones:  "{{ az }}" 
+        region: "{{ region }}"
+        launch_template: "{{ k8s_asg_lt }}"
+        state: absent
+      ignore_errors: true
+
+    - name: remove launch template
+      community.aws.ec2_launch_template:
+        state: absent
+        launch_template_ids: ["{{ lt_id }}" ]
+        name: "{{ asg_lt }}"
+        region: "{{ region }}"
+        placement:
+          availability_zone: "{{ az }}"
+        iam_instance_profile: "{{ instance_profile }}" 
+        key_name: "{{ key_name }}"
+      register: lt
+
+    - name: Remove AMI for ASG
+      amazon.aws.ec2_ami:
+        state: absent
+        image_id: "{{ ami_id }}"
+        delete_snapshot: true
+      ignore_errors: true
+      register: ami_info
+
+    - name: Remove ec2 instance
+      amazon.aws.ec2_instance:
+        state: absent
+        instance_ids: "{{ instance_id }}"
+ 
+
+
+
+

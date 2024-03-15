@@ -1,0 +1,8 @@
+- name: Create target group
+  community.aws.elb_target_group:
+    name: "{{ target_group }}"
+    protocol: "{{ tg_protocol }}"
+    port: "{{ tg_port }}"
+    vpc_id: "{{ vpc_id }}"
+    targets: "{{  }}"
+    state: present

@@ -1,0 +1,116 @@
+---
+
+- name: AWS - deploy ASG infrastructure - k8s-ubuntu-cluster
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: Pull Security Group ID
+      amazon.aws.ec2_security_group_info:
+        filters:
+          group-name: "{{ sg }}"
+      register: sec_group_info
+
+    - name: Show security group id
+      ansible.builtin.debug:
+        var: sec_group_info['security_groups'][0]['group_id']
+
+    - name: Pull Subnet ID
+      amazon.aws.ec2_vpc_subnet_info:
+        filters:
+          vpc-id: "{{ vpc_id }}"
+          "tag:Name": "{{ subnet_tag_name }}"
+          "tag:environment": "{{ new_env }}"
+      register: subnet_info
+
+    - name: Show security group id
+      ansible.builtin.debug:
+        var: subnet_info['subnets'][0]['subnet_id']
+
+    - name: Pull AMI ImageId
+      amazon.aws.ec2_ami_info:
+        region: "{{ region }}"
+        filters:
+          name: "{{ ami_name }}"
+      register: ami_info
+
+    - name: generate new user-data
+      shell: |
+        "{{ script_path }}/gen_user-data.php" "{{ s3_bucket }}"
+      register: result
+    - debug:
+        msg: "{{ result }}"
+
+    - name: create launch template
+      community.aws.ec2_launch_template:
+        name: "{{ asg_lt }}"
+        region: "{{ region }}"
+        placement:
+          availability_zone: "{{ az }}"
+        iam_instance_profile: "{{ instance_profile }}" 
+        block_device_mappings:
+          - ebs:
+              volume_size: 22
+              volume_type: gp2
+              delete_on_termination: true
+              encrypted: false
+            device_name: /dev/sdb
+        credit_specification:
+          cpu_credits: Unlimited
+        network_interfaces:
+          - device_index: 0
+            groups:
+              - "{{ sec_group_info['security_groups'][0]['group_id'] }}"
+            associate_public_ip_address: true
+            delete_on_termination: true
+            ipv6_address_count: 0
+            subnet_id: "{{ subnet_info['subnets'][0]['subnet_id'] }}"
+        monitoring:
+          enabled: true
+        user_data: "{{ lookup('file', '../scripts/user-data.64') }}"
+        image_id: "{{ ami_info['images'][0]['image_id'] }}"
+        instance_type: "{{ ins_type }}"
+        key_name: "{{ key_name }}"
+      register: lt_info
+    - debug:
+        msg: "{{ lt_info }}"
+
+    - name: Deployment Record Upate launch template
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'lt_id:'
+        line: "lt_id: {{ lt_info['template']['launch_template_id'] }}"
+
+    - name: create auto scaling group
+      amazon.aws.autoscaling_group:
+        name: "{{ asg_name }}"
+        availability_zones: [ "{{ az }}" ]
+        load_balancers: ["{{ my_elb }}"]
+        vpc_zone_identifier:
+          - "{{ subnet_info['subnets'][0]['subnet_id'] }}"
+        launch_template: 
+          launch_template_name: "{{ asg_lt }}"
+        health_check_period: 60
+        health_check_type: 'EC2'
+        replace_all_instances: True
+        min_size: 2
+        max_size: 3
+        desired_capacity: 2
+        region: "{{ region }}"
+      register: asg_info
+    - debug:
+        msg: "{{ asg_info }}"
+
+    - name: Deployment Record Update DNS Record
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'asg_id:'
+        line: "asg_id: {{ asg_info['auto_scaling_group_arn'] }}"

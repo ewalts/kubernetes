@@ -1,0 +1,241 @@
+---
+
+- name: AWS Tasks
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: import new key task key_pair
+      import_tasks:
+        file: tasks/key_pair.yml
+
+    - name: import S3 and ECR creation task
+      import_tasks:
+        file: tasks/create_s3_policy.yml
+
+    - name: import S3 and ECR creation task
+      import_tasks:
+        file: tasks/create_s3_bucket.yml
+
+    - name: Create Node communication subnet
+      amazon.aws.ec2_vpc_subnet:
+        state: present
+        vpc_id: "{{ vpc_id }}"
+        cidr: "{{ ncom_net_cidr }}"
+        tags:
+          net_role: k8s_ncom
+          environment: "{{ new_env }}"
+          Name: "{{ subnet_tag_name }}"
+      register: subnet_info
+    - debug:
+        msg: "{{ subnet_info }}"
+
+    - name: Deployment Record Update Include VPC ID
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'vpc_id:'
+        line: "vpc_id: {{ vpc_id }}"
+
+    - name: Deployment Record Update New Subnet Id
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'subnet_id:'
+        line: "subnet_id: {{ subnet_info['subnet']['id'] }}"
+
+    - name: Create node communication security group
+      amazon.aws.ec2_security_group:
+        name: "{{ sg }}"
+        description: communication for kubernetes hosts
+        vpc_id: "{{ vpc_id }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 2379-2380
+              - 10250
+              - 10257
+              - 10259
+              - 8080
+              - 443
+              - 80
+              - 22
+              - 6443
+              - 5473
+              - 4789
+              - 179
+            cidr_ip: "{{ ncom_net_cidr }}"
+          - proto: tcp
+            ports:
+              - 8080
+              - 443
+              - 80
+              - 22
+              - 6443
+            cidr_ip: "{{ my_ip }}"
+      register: sg_info 
+    - debug:
+        msg: "{{ sg_info }}"
+
+    - name: Deployment Record Update Security Group
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'sg_id:'
+        line: "sg_id: {{ sg_info['group_id'] }}"
+
+    - name: Show security group sg instance_id
+      ansible.builtin.debug:
+        var: sg_info['group_id'] 
+
+    - name: Create K8s assume Role
+      community.aws.iam_role:
+        name: "{{ iam_role }}"
+        assume_role_policy_document: "{{ lookup('file','{{ script_path }}/assume_iam_role.json') }}"
+        description: Role for nagios monitor
+        state: present
+        tags:
+          environment: "{{ new_env }}"
+      register: iam_role_info
+    - debug:
+        msg: "{{ iam_role_info }}"
+
+    - name: Deployment Record Update IAM Role
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'iam_role:'
+        line: "iam_role: {{ iam_role_info['role_id'] }}"
+
+
+    - name: AWS IAM Instance Profile - Create
+      ansible.builtin.command: aws iam create-instance-profile
+        --instance-profile-name "{{ instance_profile }}"
+      ignore_errors: true
+
+    - name: Create K8s ECR Policy
+      amazon.aws.iam_policy:
+        iam_type: role
+        iam_name: "{{ iam_role }}"
+        policy_name: "{{ policy_name }}"
+        policy_json: "{{ lookup('file', s3_policy ) }}"
+        state: present
+      register: iam_policy_info
+    - debug:
+        msg: "{{ iam_policy_info }}"
+
+    - name: Deployment Record Update IAM Policy
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'iam_policy:'
+        line: "iam_policy: {{ iam_policy_info['policy_names'][0] }}"
+
+    - name: Attach K8s IAM Role to Profile
+      ansible.builtin.command: aws iam add-role-to-instance-profile
+        --role-name "{{ iam_role }}"
+        --instance-profile-name "{{ instance_profile }}"
+      ignore_errors: true
+
+    - name: Deployment Record Update Instance Profile
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'instance_profile:'
+        line: "instance_profile: {{ instance_profile }}"
+    
+    - name: create classic elb for services
+      amazon.aws.elb_classic_lb:
+        state: present
+        name: "{{ my_elb }}"
+        security_group_ids: "{{ sg_info['group_id'] }}"
+        subnets: "{{ subnet_info['subnet']['id'] }}"
+        listeners:
+          - protocol: http
+            load_balancer_port: 80
+            instance_port: 80
+        stickiness:
+          type: loadbalancer
+          enabled: true
+          expiration: 300
+
+    - name: Deployment Record Update Load Balancer
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'elb:'
+        line: "elb: {{ my_elb }}"
+
+    - name: New EC2 Instance
+      amazon.aws.ec2_instance:
+        name: "{{ item }}"
+        key_name: "{{ key_name }}"
+        iam_instance_profile: "{{ instance_profile }}"
+        vpc_subnet_id: "{{ subnet_info['subnet']['id'] }}"
+        instance_type: "{{ ins_type }}"
+        security_groups: 
+          - "{{ sg }}"
+        network:
+          assign_public_ip: true
+        image_id: "{{ ubu_22_10g }}"
+        tags:
+          environment: "{{ new_env }}"
+      register: ec2
+    - debug:
+        msg: "{{ ec2 }}"
+
+    - name: Deployment Record Update Instance
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'instance_id:'
+        line: "instance_id: {{ ec2['instance_ids'][0] }}"
+
+    - name: Register instance in ad-hoc groups
+      add_host:
+        hostname: "{{ ec2['instances'][0]['network_interfaces'][0]['association']['public_ip'] }}"
+        groups:
+          - ec2hosts
+          - k8s
+          - k8scp
+
+    - name: Update deployment inventory.yml
+      shell: |
+        php "{{ script_path }}/update_inventory.php" "{{ groups }}"
+      ignore_errors: true
+      register: php_output
+    - debug:
+        msg: "{{ php_output }}"
+
+- name: import/run ELB DNS CNAME record
+  ansible.builtin.import_playbook: create_elb_cname.yml
+
+- name: Import/Run server firewall setup
+  ansible.builtin.import_playbook: firewall.yml
+
+- name: Import/Run basic ubuntu server setup
+  ansible.builtin.import_playbook: ubuntu_server_setup.yml
+
+- name: Import/Run K8s installation play
+  ansible.builtin.import_playbook: k8s_install.yml
+
+- name:  Import/Run AMI Creation play
+  ansible.builtin.import_playbook: generate_ami.yml
+
+- name: Initialize cluster 
+  ansible.builtin.import_playbook: cluster_init.yml
+
+- name:  Import/Run Launch Template and ASG Creation play
+  ansible.builtin.import_playbook: create_launch_template_asg.yml
+

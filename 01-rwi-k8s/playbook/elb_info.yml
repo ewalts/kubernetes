@@ -1,0 +1,10 @@
+- name: Fetch ELB Info
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Include elb info task
+      import_tasks:
+        file: tasks/elb_info.yml

@@ -1,0 +1,12 @@
+    - name: s3/ecr policy json
+      copy:
+        src: "{{ s3_policy_source }}"
+        dest: "{{ s3_policy }}"
+
+    - name: Update s3 policy json
+      shell: |
+        sed -i "s/s3_bucket/{{ s3_bucket }}/g" "{{ s3_policy }}"
+        cat "{{ s3_policy }}"
+      register: policy_json
+    - debug:
+        msg: "{{ policy_json }}"

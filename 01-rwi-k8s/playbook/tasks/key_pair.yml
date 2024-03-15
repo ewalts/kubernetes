@@ -1,0 +1,28 @@
+#- name: Check for keypair
+#  amazon.aws.ec2_key_info:
+#    name: "{{ key_name }}"
+#  register: key_info
+#  ignore_errors: true
+#- debug:
+#    msg: "{{ key_info }}"
+- name: create keypair directory
+  become: true
+  shell: |
+    sudo mkdir -p "{{ key_dir }}"
+    sudo chown eric "{{ key_dir }}"
+
+- name: create a new EC2 key pair, returns generated private key
+  amazon.aws.ec2_key:
+    name: "{{ key_name }}"
+  register: key_pair
+- debug:
+    msg: "{{ key_pair }}"
+
+- name: Write new key
+  become: true
+  shell: |
+    /usr/bin/php "{{ script_path }}/write_key.php" "{{ key_file }}" "{{ key_pair.key.private_key }}"
+    chown eric "{{ key_file }}"
+    chmod 0600 "{{ key_file }}"
+  when: key_pair.changed  == true
+

@@ -1,0 +1,11 @@
+app_namespace: nginx-php
+app_name: nginxphp
+app_file_path: "{{ deploy_path }}/kube-files/{{ app_name }}"
+pod_cidr: '10.96.0.0/16'
+yaml_docs: [
+   "{{ app_file_path }}/shared-files-pv.yml",
+   "{{ app_file_path }}/nginxphp_configmap.yml",
+   "{{ app_file_path }}/services_nginx-php.yml",
+   "{{ app_file_path }}/php-fpm_app.yml",
+   "{{ app_file_path }}/nginx_app.yml",
+   "{{ app_file_path }}/nginx_ingress.yml" ]

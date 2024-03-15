@@ -1,0 +1,30 @@
+###> Calico Tigera-operator tasks
+
+    - name: Install CNI plugin Tigera Operator Calico
+      ansible.builtin.shell: |
+        kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/tigera-operator.yaml
+
+    - name: Custom resources 
+      ansible.builtin.shell: |
+        curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/custom-resources.yaml -o /tmp/custom-resources.yaml
+
+    - name: Modify the custom resources file
+      lineinfile:
+        path: /tmp/custom-resources.yaml
+        regex: '      cidr: '
+        line: '      cidr: 10.96.0.0/16'
+
+    - name: Delay play after Tigera
+      ansible.builtin.wait_for:
+        timeout: 120
+
+    - name: Customize settings
+      ansible.builtin.shell: |
+        kubectl apply -f /tmp/custom-resources.yaml
+
+    - name: Install calicoctl
+      become: true
+      shell: |
+        curl -L https://github.com/projectcalico/calico/releases/download/v3.27.2/calicoctl-linux-amd64 -o /usr/local/bin/calicoctl
+        chmod +x /usr/local/bin/calicoctl
+

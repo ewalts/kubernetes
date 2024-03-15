@@ -1,0 +1,10 @@
+- name: Generate token for k8s
+  hosts: k8scp
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: import task for join token
+      import_tasks:
+        file: tasks/create_k8s_join_token.yml

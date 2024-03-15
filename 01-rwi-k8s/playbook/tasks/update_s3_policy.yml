@@ -1,0 +1,11 @@
+###>  This task designed as an import. requires the bucket variable
+    - name: Update s3 policy json
+      lineinfile:
+        create: true
+        state: present
+        regex: 'arn:aws:s3:::' 
+        line:  "arn:aws:s3:::{{ s3_bucket }}"
+      register: s3_update
+     - debug:
+         msg: "{{ s3_update }}"
+

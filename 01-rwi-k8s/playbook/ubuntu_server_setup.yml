@@ -1,0 +1,125 @@
+#######################################################>
+###> This Ubuntu playbook performs initial settings: 
+###> Updating packages to latest.
+###> Set the prefered timzone 
+###> Configure network time protocol
+###> Change the SSH listening port
+###> Insure root cannot direclty login over SSH
+#######################################################>
+- name: Initial server setup tasks
+  hosts: ec2hosts
+  remote_user: ubuntu
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      connection: local
+
+    - name: Update apt cache
+      become: true
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: remove ufw
+      become: true
+      apt:
+        name: ufw
+        state: absent
+
+    - name: Update installed packages
+      become: true
+      ansible.builtin.apt:
+        name: "*"
+        state: latest
+
+    - name: Import package insall tasks
+      import_tasks:
+        file: tasks/package1.yml
+
+    - name: Define prefered timezone
+      become: true
+      community.general.timezone:
+        name: "{{ my_timezone }}"
+   
+    - name: Create the ssh group
+      become: true
+      ansible.builtin.group:
+        name: "{{ ssh_group }}"
+        state: present
+
+    - name: Create a user with sudo privileges
+      become: true
+      ansible.builtin.user:
+        name: "{{ my_user }}"
+        state: present
+        groups:
+          - sudo
+          - adm
+          - docker
+          - "{{ ssh_group }}"
+        append: true
+        create_home: true
+        shell: /bin/bash
+        password: "{{ lookup('ansible.builtin.env', 'MY_PASS') }}"
+        update_password: on_create
+
+    - name: Directory structure
+      import_tasks:
+        file: tasks/create_remote_file_structure.yml
+
+    - name: SSH banner
+      import_tasks:
+        file: tasks/ssh_banner.yml
+
+
+    - name: Add ubuntu user to the allowed group
+      become: true
+      ansible.builtin.shell:
+        usermod -a -G "{{ ssh_group }}" ubuntu
+
+    - name: Set authorized key for remote user
+      become: true
+      ansible.posix.authorized_key:
+        user: "{{ my_user }}"
+        state: present
+        key: "{{ copy_local_key }}"
+
+
+    - name: Grant SUDO access
+      become: true
+      ansible.builtin.shell: |
+        echo '{{ my_user }} ALL=(ALL) NOPASSWD:ALL'  >> '/tmp/01-{{ my_user }}-full'
+        cp -f '/tmp/01-{{ my_user }}-full'  '/etc/sudoers.d/01-{{ my_user }}-full'
+
+    - name: Disable remote login for root
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        state: present
+        regexp: '^PermitRootLogin yes'
+        line: 'PermitRootLogin no'
+
+    - name: Configure SSH AllowGroups
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        state: present
+        line: 'AllowGroups "{{ ssh_group }}"'
+        insertafter: '#VersionAddendum none'
+
+    - name: Remove excess packages no longer needed
+      become: true
+      ansible.builtin.apt:
+        autoremove: yes
+
+    - name: Reboot all hosts
+      become: true
+      ansible.builtin.reboot:

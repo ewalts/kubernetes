@@ -1,0 +1,32 @@
+###>  K8s join token tasks 
+
+    - name: Create join token for worker nodes
+      ansible.builtin.shell: |
+        sudo kubeadm token create  --print-join-command
+      register: kubernetes_join_command
+
+    - name: Save join command to S3.
+      amazon.aws.s3_object:
+        bucket: "{{ s3_bucket }}"
+        mode: put
+        object: kubernetes_join_command
+        content: "{{ kubernetes_join_command.stdout_lines[0] }}"
+
+    - name: Token update automation script
+      ansible.builtin.copy:
+        src: files/update-token.sh
+        dest: "{{ deploy_path }}/cronjobs/update-token.sh"
+        owner: "{{ my_user }}"
+        group: "{{ ssh_group }}"
+        mode: 0750
+
+    - name: Create cron to keep the join token current
+      ansible.builtin.cron:
+        name: "Update Join Token"
+        minute: "0"
+        hour: "0,12"
+        job: "{{ deploy_path }}/cronjobs/update-token.sh >> {{ deploy_path }}/logs/update-cron.log"
+      register: result
+    - debug:
+        msg: "{{ result }}"
+

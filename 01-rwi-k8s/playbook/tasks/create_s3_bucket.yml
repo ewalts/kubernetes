@@ -1,0 +1,35 @@
+    - name: Creat s3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ s3_bucket }}"
+        state: present
+#        policy: "{{ bucket_policy }}"
+      register: s3
+    - debug:
+        msg: "{{ s3 }}"
+
+    - name: Deployment Record Update Include s3_bucket
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 's3_bucket:'
+        line: "s3_bucket: {{ s3_bucket }}"
+      ignore_errors: true
+
+    - name: Creating new container registry
+      community.aws.ecs_ecr:
+        name: "{{ ecr_reg_name }}"
+        state: present
+      register: ecr_reg
+    - debug:
+        msg: "{{ ecr_reg }}"
+
+    - name: Deployment Record Update Include s3_bucket
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'ecr_registry:'
+        line: "ecr_registry: {{ ecr_reg_name }}"
+      ignore_errors: true
+

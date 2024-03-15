@@ -1,0 +1,10 @@
+- name: Fetch ASG Info
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Include asg info task
+      import_tasks:
+        file: tasks/asg_info.yml

@@ -1,0 +1,13 @@
+- name: Fetch s3 bucket information
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: s3 bucket info
+      amazon.aws.s3_bucket_info:
+        name: "{{ s3_bucket }}"
+      register: s3_info
+    - debug:
+        msg: "{{ s3_info }}"

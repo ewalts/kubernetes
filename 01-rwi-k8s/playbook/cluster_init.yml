@@ -1,0 +1,68 @@
+---
+- name: Initialize K8s Cluster
+  hosts: ec2hosts
+  gather_facts: false
+  vars_files: 
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+
+    - name: Wait for ssh
+      ansible.builtin.wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      connection: local
+
+    - name: Start kubelet
+      ansible.builtin.shell: |
+        sudo systemctl enable kubelet
+        sudo systemctl start kubelet
+
+    - name: Initialize k8s cluster
+      ansible.builtin.shell: | 
+        sudo kubeadm init --pod-network-cidr=10.96.0.0/16
+      register: kubernetes_init_output
+
+    - debug:
+        msg: "{{ kubernetes_init_output.stdout }}"
+
+    - name: Create .kube directory
+      ansible.builtin.file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+
+    - name: Create kube user kubeconfig file from admin.conf
+      become: true
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ my_user }}/.kube/config"
+        remote_src: yes
+        owner: "{{ my_user }}"
+        group: "{{ my_group }}"
+        mode: 0600
+
+
+
+    - name: Create initial join token
+      import_tasks:
+        file: tasks/create_k8s_join_token.yml
+
+    - name: Create token update cron
+      import_tasks:
+        file: tasks/create_join_token_cron.yml
+
+    - name: Install Nginx-Ingress Controller
+      import_tasks:
+        file: tasks/install_nginx-ingress-controller.yml
+
+    - name: Install CNI plugin Tigera Operator Calico
+      import_tasks:
+        file: tasks/install_calico_cni_tigera-operator.yml
+
+#    - name: Install cert-manager
+#      import_tasks:
+#        file: tasks/install_cert-manager.yml
+

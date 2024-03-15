@@ -1,0 +1,22 @@
+- name: copy controller kube-files
+  copy:
+    src: kube-files/nginx-ingress
+    dest: "{{ deploy_path }}/kube-files"
+  register: result
+- debug:
+    msg: "{{ result }}"
+
+- name: install nginx-ingress controller
+  shell: |
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/ns-and-sa.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/rbac/rbac.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/rbac/ap-rbac.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/ingress-class.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/ingress-class.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/ingress-class.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/ingress-class.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/common/nginx-config.yaml
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deploy/crds.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deploy/crds-nap-waf.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deploy/crds-nap-dos.yaml 
+    kubectl apply -f $HOME/01-rwi-k8s/kube-files/nginx-ingress/deployments/daemon-set/nginx-ingress.yaml

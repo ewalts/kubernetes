@@ -1,0 +1,54 @@
+###>  Vars generated from generate_vars_from_play.php from rewbin.org Richard Walts, Inc.
+###>   AWS - Create EC2 Instance
+create_vpc: false
+asg_name: 01-k8s-w2-asg
+ami_name: 01-k8s-ubu-22
+tags_name: 01-k8s-w2
+s3_repo: 's3://ew-k8s'
+iam_role: 01-k8s-w2-EC2-Role
+instance_profile: 01-k8s-w2-EC2-Profile
+policy_name: 01-k8s-w2-EC2-Policy
+vpc_id: vpc-031xxxxxxxx
+cidr_block: '10.1.0.0/16'
+ncom_net_cidr: '10.1.245.0/28'
+svc_net_cidr: '10.1.1.0/24'
+my_timezone: 'Pacific/Honolulu'
+my_remote_user: myuser
+my_user: myuser
+my_gruop: mygroup
+item: k8s-w2-cluster-cp 
+ins_type: t2.medium
+key_name: k8s-keyname
+ncom_net_sg: 01-k8s-w2-ncoms
+sg: 01-k8s
+sg_tag_name: 01-k8s-w2-ncoms
+new_env: k8s-w2
+key_file: ~/.ssh/my-aws-keys/k8s-w2.pem
+my_ssh_key_path: ~/.ssh/my-aws-keys/k8s-w2.pem
+dns_zone: example.org
+host_record: host.example.org
+my_elb: 01-k8s-w2-lb01
+k8s_asg_lt: 01-k8s-launch-template
+k8s_asg: 01-k8s-w2-asg
+region: us-west-2
+az: us-west-2c
+s3_bucket: k8s-w2
+#################################
+deployment_log: "~/.ansible/output/deployment_register.log"
+my_ip: x.x.x.x/32
+ ###> my_elb: k8s-service-lb
+ ###> sg_id:                      #  registerd var or not   - "{{ sec_group_info['security_groups'][0]['group_id'] }}"
+ ###> subnet_id:                  #  registered var or not- "{{ lookup ('file', '/tmp/asg_subnet_id') }}"
+subnet_tag_name: 01-k8s-w2-subnet                             #  registered var instance_id: "{{ lookup ('file', '/tmp/asg_instance_id') }}"
+ami_name: 01-k8s-ubu-22      #  name: "{{ ami_name }}"
+ncom_tag_name: 01-k8s-w2          #  Name: "{{ tags_name }}"
+tags_service: 01-K8s-w2       #  
+asg_lt: 01-k8s-w2-cl-lt      #  asg launch template name
+asg_name: 01-k8s-w2-cl
+ ###>  registered var asg ami image_id: "{{ ami['image_id'] }}"
+ ###> new_vpc_name: 01-Kube-ASG-VPC 
+ ###> Limitation of choosing AZ specificly during VPC creation, coupled with lack of instance types in certain AZ, creating VPCs on the fly can be problematic. 
+ ###> Subnetting existing cidr_blocks of existing VPCs is usually not an issue.
+ ###> new_vpc_app: k8s  ###>  If your using large instances or multi-az anyway don't care which zone. 
+ ###> new_vpc_purpose: k8s_cluster 
+s3_bucket: s3://MY_BUCKET

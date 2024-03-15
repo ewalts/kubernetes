@@ -1,0 +1,7 @@
+- name: Fetch ELB Info
+  community.aws.elb_classic_lb_info:
+    names: "{{ my_elb }}"
+  register: elb_info
+- debug:
+    msg: "{{ elb_info }}"
+

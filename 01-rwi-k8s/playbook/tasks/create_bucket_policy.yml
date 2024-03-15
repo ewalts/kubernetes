@@ -1,0 +1,33 @@
+    - name: s3/ecr policy json
+      copy:
+        src: "{{ s3_policy_source }}"
+        dest: "{{ s3_policy }}"
+
+    - name: Update s3 policy json
+      lineinfile:
+        path: "{{ s3_policy }}"
+        create: true
+        state: present
+        regex: '            "Resource": "arn:aws:s3'
+        line:  "            \"Resource\": \"arn:aws:s3:::{{ s3_bucket }}*/*\""
+      register: s3_update
+    - debug:
+        msg: "{{ s3_update }}"
+
+
+    - name: bucket policy json
+      copy:
+        src: "{{ bucket_policy_src }}"
+        dest: "{{ bucket_policy }}"
+
+    - name: Update s3 policy json
+      lineinfile:
+        path: "{{ bucket_policy }}"
+        create: true
+        state: present
+        regex: '  "Resource": "arn:aws:s3'
+        line:  "  \"Resource\": \"arn:aws:s3::{{ s3_bucket }}/*\""
+      register: bucket_update
+    - debug:
+        msg: "{{ bucket_update }}"
+

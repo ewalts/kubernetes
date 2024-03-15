@@ -1,0 +1,104 @@
+---
+## This playbook is for creating just the k8s ASG if everything else exists already.
+- name: AWS - deploy ASG infrastructure - k8s-ubuntu-cluster
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+  hosts: k8scp
+ # remote_user: "{{ my_remote_user }}"
+  gather_facts: false
+  tasks:
+    - name: Create join token for worker nodes
+      ansible.builtin.shell: |
+        sudo kubeadm token create  --print-join-command
+      register: kubernetes_join_command
+    - debug:
+        msg: "{{ kubernetes_join_command.stdout }}"
+
+    - name: Deployment Record Update k8s Cluster Join Command
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}" 
+        regexp: 'k8s_join_command:'
+        line: "k8s_join_command: {{ kubernetes_join_command.stdout }}"
+
+    - name: Save join command to S3.
+      amazon.aws.s3_object:
+        bucket: "{{ s3_bucket }}"
+        mode: put
+        object: kubernetes_join_command
+        content: "{{ kubernetes_join_command.stdout_lines[0] }}"
+
+    - name: Create cron to keep the join token current
+      import_tasks:
+        file: tasks/create_join_token_cron.yml
+
+
+
+- name: AWS - deploy ASG infrastructure - k8s-ubuntu-cluster
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: Pull Security Group ID
+      amazon.aws.ec2_security_group_info:
+        filters:
+          group-name: "{{ sg }}"
+      register: sg_info
+
+    - name: Show security group id
+      ansible.builtin.debug:
+        var: sg_info['security_groups'][0]['group_id']
+
+    - name: Pull Subnet ID
+      amazon.aws.ec2_vpc_subnet_info:
+        filters:
+          vpc-id: "{{ vpc_id }}"
+          "tag:Name": "{{ subnet_tag_name }}"
+      register: subnet_info
+
+    - name: Show security group id
+      ansible.builtin.debug:
+        var: subnet_info['subnets'][0]['subnet_id']
+
+    - name: Pull AMI ImageId
+      amazon.aws.ec2_ami_info:
+        region: "{{ region }}"
+        filters:
+          name: "{{ ami_name }}"
+      register: ami_info
+
+    - name: create auto scaling group
+      amazon.aws.autoscaling_group:
+        name: "{{ asg_name }}"
+        availability_zones: [ "{{ az }}" ]
+        load_balancers: ["{{ my_elb }}"]
+        vpc_zone_identifier:
+          - "{{ subnet_info['subnets'][0]['subnet_id'] }}"
+        launch_template: 
+          launch_template_name: "{{ asg_lt }}"
+        health_check_period: 60
+        health_check_type: 'EC2'
+        replace_all_instances: True
+        min_size: 2
+        max_size: 3
+        desired_capacity: 2
+        region: "{{ region }}"
+      register: asg_info
+    - debug:
+        msg: "{{ asg_info }}"
+
+    - name: Deployment Record Update DNS Record
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'auto_scaling_group_arn:'
+        line: "auto_scaling_group_arn: {{ asg_info['auto_scaling_group_arn'] }}"
+

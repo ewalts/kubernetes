@@ -1,0 +1,10 @@
+- name: Configure ecr secret
+  hosts: localhost
+  vars_files:
+    - vars/deployment_vars.yml
+    - vars/app_deployment_vars.yml
+  tasks:
+    - name: Generate token
+
+    - name: 
+

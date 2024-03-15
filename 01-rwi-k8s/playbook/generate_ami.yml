@@ -1,0 +1,46 @@
+---
+
+- name: AWS - Create AMI for launch template - k8s-ubuntu-cluster
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+    - vars/aws_template_vars.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    
+    - name: Pull new InstanceID
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          instance-state-name: [ "running" ]
+          "tag:environment": "{{ new_env }}"
+      register: instance_info
+
+    - name: Show instance information
+      ansible.builtin.debug:
+        var: instance_info
+
+    - name: Create AMI for ASG
+      amazon.aws.ec2_ami:
+        instance_id: "{{ instance_info['instances'][0]['instance_id'] }}"
+        wait: true
+        name: "{{ ami_name }}"
+        tags:
+          Name: "{{ tags_name }}"
+          Service: "{{ tags_service }}"
+      register: ami
+      ignore_errors: true
+      register: ami_info
+
+    - debug:
+        msg: "{{ ami_info }}"
+
+    - name: Deployment Record Update AMI 
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'ami_id:'
+        line: "ami_id: {{ ami_info['image_id'] }}"
+

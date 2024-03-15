@@ -1,0 +1,48 @@
+- name: Fetch elb information
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/sec_vars.yml
+    - vars/deployment_vars.yml
+  tasks:
+    - name: Elb info
+      community.aws.elb_classic_lb_info:
+      register: elb_info
+
+    - ansible.builtin.debug:
+        msg: "{{ elb_info.elbs[0].dns_name }}"
+
+    - name: Create CNAME record for ELB
+      amazon.aws.route53:
+        state: present
+        zone: "{{ dns_zone }}"
+        record: "{{ elb_record }}"
+        overwrite: true
+        type: CNAME
+        ttl: 7200
+        value: "{{ elb_info.elbs[0].dns_name }}"
+      ignore_errors: true
+      register: dns
+    - debug:
+        msg: "{{ dns }}"
+
+    - name: Deployment Record Update DNS Record
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'elb_cname_record:'
+        line: "elb_cname_record: {{ dns['diff']['resource_record_sets'][0]['resource_records'][0]['value'] }} CNAME {{ dns['diff']['resource_record_sets'][0]['name'] }}"
+      when: (dns['diff']['resource_record_sets'][0]['name'] != '' ) == true
+      ignore_errors: true
+
+    - name: Deployment Record Update DNS Record
+      lineinfile:
+        state: present
+        create: true
+        path: "{{ deployment_log }}"
+        regexp: 'elb_cname_record:'
+        line: "elb_cname_record: {{ dns['resource_records_sets'][0]['resource_records'][0]['value'] }} CNAME {{ dns['resource_records_sets'][0]['name'] }}"
+      when: (dns['resource_records_sets'][0]['name'] != '' ) == true
+      ignore_errors: true
+

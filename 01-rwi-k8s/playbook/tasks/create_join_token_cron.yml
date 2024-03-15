@@ -1,0 +1,17 @@
+    - name: Script for cron is present
+      ansible.builtin.copy:
+        src: files/update-token.sh
+        dest: "$HOME/{{ product_id }}/cronjobs/update-token.sh"
+        mode: 0750
+
+
+    - name: Create cron to keep the join token current
+      ansible.builtin.cron:
+        name: "Update Join Token"
+        minute: "0"
+        hour: "0,12"
+        job: "{{ deploy_path }}/cronjobs/update-token.sh >> {{ deploy_path }}/logs/update-cron.log"
+      register: result
+    - debug:
+        msg: "{{ result }}"
+
