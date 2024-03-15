@@ -1,4 +1,4 @@
-- name: Create target group
+- name: Remove target group
   community.aws.elb_target_group:
     name: "{{ target_group }}"
     protocol: "{{ tg_protocol }}"
