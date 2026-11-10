@@ -51,3 +51,35 @@
         - "{{ my_ip }}"
         - "{{ pod_cidr }}"
       
+- name: Iptables - Permit existing and related network connections
+  become: true
+  ansible.builtin.iptables:
+    chain: INPUT
+    match: conntrack
+    ctstate: RELATED,ESTABLISHED
+    jump: ACCEPT
+    action: insert
+    rule_num: 1
+    state: present
+
+- name: Iptables - Set the default INPUT DROP policy
+  become: true
+  ansible.builtin.iptables:
+    chain: INPUT
+    policy: DROP
+
+- name: Iptables - directory /etc/iptables
+  become: true
+  file: 
+    path: /etc/iptables
+    state: directory
+    owner: root
+  ignore_errors: true
+
+- name: Iptables - Save
+  become: true
+  community.general.iptables_state:
+    ip_version: ipv4
+    table: filter
+    state: saved
+    path: /etc/iptables/rules.v4
